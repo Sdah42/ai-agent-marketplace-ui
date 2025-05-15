@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Agent Marketplace Index</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+      body {
+        background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%);
+        min-height: 100vh;
+      }
+      .favorite { color: #fbbf24; }
+      .category-btn.active, .category-btn:hover { background: #6366f1; color: #fff; }
+      .dark body {
+        background: linear-gradient(135deg, #232946 0%, #1a1a2e 100%);
+      }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen transition-colors duration-300">
+    <nav class="bg-gradient-to-r from-indigo-700 to-indigo-500 shadow-md py-4 px-6 flex items-center justify-between">
+        <div class="text-2xl font-extrabold tracking-tight text-white drop-shadow">AI Agent Marketplace</div>
+        <button id="toggle-theme" class="px-3 py-1 rounded bg-white/20 hover:bg-white/30 text-white transition text-xl" title="Basculer le thème">🌙</button>
+    </nav>
+
+    <main class="flex-1 flex flex-col items-center justify-center px-2 py-8">
+        <!-- Barre de recherche -->
+        <form id="search-form" class="w-full max-w-2xl mx-auto flex items-center bg-white/80 rounded-xl shadow-lg p-2 gap-2 sticky top-6 z-10 backdrop-blur">
+            <input id="search-input" type="text" placeholder="🔎 Rechercher un agent IA (ex : chatbot, coding, HR...)" class="flex-1 px-5 py-3 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-lg bg-transparent" required>
+            <button type="submit" class="px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition text-lg shadow">Rechercher</button>
+        </form>
+        <!-- Catégories -->
+        <div class="flex flex-wrap justify-center gap-3 mt-8 mb-6 w-full max-w-2xl">
+            <button class="category-btn px-4 py-2 rounded-full bg-indigo-100 text-indigo-700 font-medium shadow hover:bg-indigo-200 transition" data-cat="Coding">Coding</button>
+            <button class="category-btn px-4 py-2 rounded-full bg-pink-100 text-pink-700 font-medium shadow hover:bg-pink-200 transition" data-cat="Chatbot">Chatbot</button>
+            <button class="category-btn px-4 py-2 rounded-full bg-green-100 text-green-700 font-medium shadow hover:bg-green-200 transition" data-cat="HR">RH</button>
+            <button class="category-btn px-4 py-2 rounded-full bg-yellow-100 text-yellow-700 font-medium shadow hover:bg-yellow-200 transition" data-cat="Finance">Finance</button>
+            <button class="category-btn px-4 py-2 rounded-full bg-red-100 text-red-700 font-medium shadow hover:bg-red-200 transition" data-cat="Healthcare">Santé</button>
+            <button class="category-btn px-4 py-2 rounded-full bg-gray-100 text-gray-700 font-medium shadow hover:bg-gray-200 transition" data-cat="Productivity">Productivité</button>
+            <button class="category-btn px-4 py-2 rounded-full bg-purple-100 text-purple-700 font-medium shadow hover:bg-purple-200 transition" data-cat="Other">Autre</button>
+        </div>
+        <!-- Résultats -->
+        <div id="results" class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 mt-4"></div>
+        <div id="no-results" class="hidden text-gray-500 mt-8 text-center text-lg">Aucun agent trouvé.</div>
+    </main>
+
+    <!-- Favoris -->
+    <section class="bg-white/80 dark:bg-gray-900/80 py-8 px-2 shadow-inner">
+        <div class="max-w-5xl mx-auto">
+            <h2 class="text-2xl font-bold mb-4 text-indigo-700 dark:text-indigo-200 flex items-center gap-2">⭐ Favoris</h2>
+            <div id="favorites" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+        </div>
+    </section>
+
+    <footer class="bg-gradient-to-r from-indigo-700 to-indigo-500 text-white py-5 text-center text-lg mt-10 shadow-inner select-none">&copy; 2025 AI Agent Marketplace</footer>
+
+    <script>
+    const apiUrl = '/api/search';
+    const resultsDiv = document.getElementById('results');
+    const noResults = document.getElementById('no-results');
+    const favoritesDiv = document.getElementById('favorites');
+    const searchForm = document.getElementById('search-form');
+    const searchInput = document.getElementById('search-input');
+    const catBtns = document.querySelectorAll('.category-btn');
+    let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+
+    // UI: Affichage des agents
+    function renderAgents(agents, container, showFavBtn = true) {
+        container.innerHTML = '';
+        if (!agents.length) {
+            if (container === resultsDiv) noResults.classList.remove('hidden');
+            return;
+        }
+        if (container === resultsDiv) noResults.classList.add('hidden');
+        agents.forEach(agent => {
+            const isFav = favorites.some(f => f.content_name === agent.content_name);
+            const card = document.createElement('div');
+            card.className = 'bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 flex flex-col gap-2 hover:scale-[1.025] hover:shadow-2xl transition transform duration-200 border border-transparent hover:border-indigo-300';
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="text-xl font-bold text-indigo-700 dark:text-indigo-200">${agent.content_name || 'Sans nom'}</h3>
+                    ${showFavBtn ? `<button title="Ajouter aux favoris" class="favorite-btn ${isFav ? 'favorite' : ''} text-2xl">${isFav ? '★' : '☆'}</button>` : ''}
+                </div>
+                <div class="text-sm text-gray-500 mb-1">${agent.field || ''} ${agent.subfield ? '· ' + agent.subfield : ''}</div>
+                <div class="text-gray-800 dark:text-gray-200 mb-2">${agent.description || 'Aucune description.'}</div>
+                <div class="flex items-center gap-3 mt-auto">
+                    ${agent.website ? `<a href="${agent.website}" target="_blank" class="text-indigo-500 hover:underline font-medium">Visiter le site</a>` : ''}
+                    <span class="text-xs text-gray-400">${agent.statistic ? 'Stats: ' + JSON.stringify(agent.statistic) : ''}</span>
+                </div>
+            `;
+            if (showFavBtn) {
+                card.querySelector('.favorite-btn').onclick = () => toggleFavorite(agent);
+            }
+            container.appendChild(card);
+        });
+    }
+
+    function toggleFavorite(agent) {
+        const idx = favorites.findIndex(f => f.content_name === agent.content_name);
+        if (idx >= 0) favorites.splice(idx, 1);
+        else favorites.push(agent);
+        localStorage.setItem('favorites', JSON.stringify(favorites));
+        renderFavorites();
+        if (window.lastSearchResults) renderAgents(window.lastSearchResults, resultsDiv);
+    }
+
+    function renderFavorites() {
+        renderAgents(favorites, favoritesDiv, false);
+    }
+
+    // Recherche API
+    searchForm.onsubmit = async e => {
+        e.preventDefault();
+        resultsDiv.innerHTML = '<div class="col-span-2 text-center text-gray-400">Recherche en cours...</div>';
+        try {
+            const q = searchInput.value.trim();
+            const res = await fetch(`${apiUrl}?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            let agents = [];
+            if (typeof data.results === 'string') {
+                agents = data.results.split(/\n\n/).map(block => {
+                    const obj = {};
+                    block.split(/\n/).forEach(line => {
+                        const [key, ...rest] = line.split(':');
+                        if (key && rest.length) obj[key.trim().replace('AI Agent Name','content_name').replace('Website','website').replace('Description','description').replace('Field','field').replace('SubField','subfield').replace('Statistic','statistic')] = rest.join(':').trim();
+                    });
+                    if (obj.statistic) {
+                        try { obj.statistic = JSON.parse(obj.statistic); } catch {}
+                    }
+                    return obj;
+                }).filter(a => a.content_name);
+            } else if (Array.isArray(data.results)) {
+                agents = data.results;
+            }
+            window.lastSearchResults = agents;
+            renderAgents(agents, resultsDiv);
+        } catch (err) {
+            resultsDiv.innerHTML = '<div class="col-span-2 text-center text-red-500">Erreur lors de la recherche.</div>';
+        }
+    };
+
+    // Catégories
+    catBtns.forEach(btn => {
+        btn.onclick = () => {
+            catBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            searchInput.value = btn.dataset.cat;
+            searchForm.dispatchEvent(new Event('submit'));
+        };
+    });
+
+    // Thème sombre/clair
+    document.getElementById('toggle-theme').onclick = () => {
+        document.body.classList.toggle('dark');
+        localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : '');
+    };
+    if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+
+    renderFavorites();
+    </script>
+</body>
+            <h2 class="text-xl font-semibold mb-3">⭐ Favoris</h2>
+            <div id="favorites" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </div>
+    </section>
+    <footer class="bg-indigo-700 text-white py-4 text-center mt-10">&copy; 2025 AI Agent Marketplace</footer>
+
+    function renderAgents(agents, container, showFavBtn = true) {
+        container.innerHTML = '';
+        if (!agents.length) {
+            if (container === resultsDiv) noResults.classList.remove('hidden');
+            return;
+        }
+        if (container === resultsDiv) noResults.classList.add('hidden');
+        agents.forEach(agent => {
+            const isFav = favorites.some(f => f.content_name === agent.content_name);
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow p-5 flex flex-col gap-2 hover:shadow-lg transition';
+            card.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-indigo-700">${agent.content_name || 'Sans nom'}</h3>
+                    ${showFavBtn ? `<button title="Ajouter aux favoris" class="favorite-btn ${isFav ? 'favorite' : ''}">${isFav ? '★' : '☆'}</button>` : ''}
+                </div>
+                <div class="text-sm text-gray-600 mb-2">${agent.field || ''} ${agent.subfield ? '· ' + agent.subfield : ''}</div>
+                <div class="text-gray-800">${agent.description || 'Aucune description.'}</div>
+                <div class="flex items-center gap-2 mt-2">
+                    ${agent.website ? `<a href="${agent.website}" target="_blank" class="text-indigo-500 hover:underline">Visiter le site</a>` : ''}
+                    <span class="text-xs text-gray-400">${agent.statistic ? 'Stats: ' + JSON.stringify(agent.statistic) : ''}</span>
+                </div>
+            `;
+            if (showFavBtn) {
+                card.querySelector('.favorite-btn').onclick = () => toggleFavorite(agent);
+            }
+            container.appendChild(card);
+        });
+    }
+
+    function toggleFavorite(agent) {
+        const idx = favorites.findIndex(f => f.content_name === agent.content_name);
+        if (idx >= 0) favorites.splice(idx, 1);
+        else favorites.push(agent);
+        localStorage.setItem('favorites', JSON.stringify(favorites));
+        renderFavorites();
+        // Met à jour l'état favoris sur les résultats
+        if (window.lastSearchResults) renderAgents(window.lastSearchResults, resultsDiv);
+    }
+
+    function renderFavorites() {
+        renderAgents(favorites, favoritesDiv, false);
+    }
+
+    searchForm.onsubmit = async e => {
+        e.preventDefault();
+        resultsDiv.innerHTML = '<div class="col-span-2 text-center text-gray-400">Recherche en cours...</div>';
+        try {
+            const q = searchInput.value.trim();
+            const res = await fetch(`${apiUrl}?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            let agents = [];
+            // Extraction intelligente si le backend renvoie du texte
+            if (typeof data.results === 'string') {
+                // Parse text blocks
+                agents = data.results.split(/\n\n/).map(block => {
+                    const obj = {};
+                    block.split(/\n/).forEach(line => {
+                        const [key, ...rest] = line.split(':');
+                        if (key && rest.length) obj[key.trim().replace('AI Agent Name','content_name').replace('Website','website').replace('Description','description').replace('Field','field').replace('SubField','subfield').replace('Statistic','statistic')] = rest.join(':').trim();
+                    });
+                    // Parse statistic JSON
+                    if (obj.statistic) {
+                        try { obj.statistic = JSON.parse(obj.statistic); } catch {}
+                    }
+                    return obj;
+                }).filter(a => a.content_name);
+            } else if (Array.isArray(data.results)) {
+                agents = data.results;
+            }
+            window.lastSearchResults = agents;
+            renderAgents(agents, resultsDiv);
+        } catch (err) {
+            resultsDiv.innerHTML = '<div class="col-span-2 text-center text-red-500">Erreur lors de la recherche.</div>';
+        }
+    };
+
+    // Thème sombre/clair
+    document.getElementById('toggle-theme').onclick = () => {
+        document.body.classList.toggle('dark');
+        localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : '');
+    };
+    // Appliquer le thème au chargement
+    if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+
+    renderFavorites();
+    </script>
+</body>
+</html>
